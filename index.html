@@ -536,6 +536,16 @@
             box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
         }
 
+        .type-option.transfer-opt {
+            color: var(--text-muted);
+        }
+
+        .type-option.transfer-opt.selected {
+            background-color: var(--accent-primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 217, 255, 0.25);
+        }
+
         /* Buttons styling */
         .btn {
             display: inline-flex;
@@ -692,6 +702,12 @@
             background-color: rgba(239, 68, 68, 0.15);
             color: var(--accent-danger);
             border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .badge-transfer {
+            background-color: rgba(0, 217, 255, 0.12);
+            color: var(--accent-primary);
+            border: 1px solid rgba(0, 217, 255, 0.3);
         }
 
         /* Settings View Panels Grid */
@@ -1307,10 +1323,11 @@
                     <h2 class="panel-title"><i class="fa-solid fa-circle-plus" style="color: var(--accent-primary);"></i> Add Transaction</h2>
                     
                     <form id="transaction-form" onsubmit="handleTransactionSubmit(event)">
-                        <!-- Income / Expense switcher -->
+                        <!-- Transaction type switcher -->
                         <div class="type-selector">
-                            <div class="type-option income-opt selected" onclick="setEntryType('income')">Income</div>
+                            <div class="type-option income-opt selected" onclick="setEntryType('income')">Invest</div>
                             <div class="type-option expense-opt" onclick="setEntryType('expense')">Expense</div>
+                            <div class="type-option transfer-opt" onclick="setEntryType('transfer')">Transfer</div>
                         </div>
                         <input type="hidden" id="entry-type" value="income">
 
@@ -1333,7 +1350,14 @@
                             </select>
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group" id="transfer-group" style="display: none;">
+                            <label class="form-label" for="entry-transfer-from">From Account</label>
+                            <select id="entry-transfer-from" class="input-control"></select>
+                            <label class="form-label" for="entry-transfer-to" style="margin-top: 12px;">To Account</label>
+                            <select id="entry-transfer-to" class="input-control"></select>
+                        </div>
+
+                        <div class="form-group" id="account-group">
                             <label class="form-label" for="entry-account">Payment Method / Account</label>
                             <select id="entry-account" class="input-control" required>
                                 <!-- Dynamically filled -->
@@ -1393,8 +1417,9 @@
                             <label class="form-label" style="font-size: 0.85rem;">Type</label>
                             <select id="filter-type" class="input-control" style="padding: 8px 12px;" onchange="renderAll()">
                                 <option value="all">All Transactions</option>
-                                <option value="income">Income Only</option>
+                                <option value="income">Investments Only</option>
                                 <option value="expense">Expense Only</option>
+                                <option value="transfer">Transfers Only</option>
                             </select>
                         </div>
                         <div>
@@ -1869,26 +1894,31 @@
         }
     }
 
-    // Switch form fields for Income/Expense
+    // Switch form fields for each transaction type
     function setEntryType(type) {
         document.getElementById('entry-type').value = type;
         
         const incomeOpt = document.querySelector('.type-option.income-opt');
         const expenseOpt = document.querySelector('.type-option.expense-opt');
+        const transferOpt = document.querySelector('.type-option.transfer-opt');
         const sourceGroup = document.getElementById('source-group');
         const sectorGroup = document.getElementById('sector-group');
+        const transferGroup = document.getElementById('transfer-group');
+        const accountGroup = document.getElementById('account-group');
+        const accountSelect = document.getElementById('entry-account');
+        const transferFrom = document.getElementById('entry-transfer-from');
+        const transferTo = document.getElementById('entry-transfer-to');
 
-        if (type === 'income') {
-            incomeOpt.classList.add('selected');
-            expenseOpt.classList.remove('selected');
-            sourceGroup.style.display = 'block';
-            sectorGroup.style.display = 'none';
-        } else {
-            expenseOpt.classList.add('selected');
-            incomeOpt.classList.remove('selected');
-            sourceGroup.style.display = 'none';
-            sectorGroup.style.display = 'block';
-        }
+        incomeOpt.classList.toggle('selected', type === 'income');
+        expenseOpt.classList.toggle('selected', type === 'expense');
+        transferOpt.classList.toggle('selected', type === 'transfer');
+        sourceGroup.style.display = type === 'income' ? 'block' : 'none';
+        sectorGroup.style.display = type === 'expense' ? 'block' : 'none';
+        transferGroup.style.display = type === 'transfer' ? 'block' : 'none';
+        accountGroup.style.display = type === 'transfer' ? 'none' : 'block';
+        accountSelect.required = type !== 'transfer';
+        transferFrom.required = type === 'transfer';
+        transferTo.required = type === 'transfer';
     }
 
     // Add entry submitted from transaction form
@@ -1897,19 +1927,27 @@
 
         const type = document.getElementById('entry-type').value;
         const amount = parseFloat(document.getElementById('entry-amount').value);
-        const account = document.getElementById('entry-account').value;
+        const transferFrom = document.getElementById('entry-transfer-from').value;
+        const transferTo = document.getElementById('entry-transfer-to').value;
+        const account = type === 'transfer' ? transferFrom : document.getElementById('entry-account').value;
         const date = document.getElementById('entry-date').value;
         const notes = document.getElementById('entry-notes').value.trim();
         
         let category = '';
         if (type === 'income') {
             category = document.getElementById('entry-source').value;
-        } else {
+        } else if (type === 'expense') {
             category = document.getElementById('entry-sector').value;
+        } else {
+            category = 'Account Transfer';
         }
 
         if (!amount || amount <= 0) {
             showToast('Please enter a valid amount.', 'danger');
+            return;
+        }
+        if (type === 'transfer' && (!transferFrom || !transferTo || transferFrom === transferTo)) {
+            showToast('Choose two different accounts for the transfer.', 'danger');
             return;
         }
 
@@ -1919,6 +1957,7 @@
             amount,
             category,
             account,
+            transfer_account: type === 'transfer' ? transferTo : null,
             date,
             notes: notes || 'No description'
         }]);
@@ -2058,6 +2097,8 @@
         const sourceSelect = document.getElementById('entry-source');
         const sectorSelect = document.getElementById('entry-sector');
         const accountSelect = document.getElementById('entry-account');
+        const transferFrom = document.getElementById('entry-transfer-from');
+        const transferTo = document.getElementById('entry-transfer-to');
         const filterAccount = document.getElementById('filter-account');
 
         // Populate Source Select
@@ -2074,13 +2115,18 @@
 
         // Populate Account Selects
         accountSelect.innerHTML = '';
+        transferFrom.innerHTML = '';
+        transferTo.innerHTML = '';
         const prevFilterVal = filterAccount.value;
         filterAccount.innerHTML = '<option value="all">All Accounts</option>';
         
         ledgerState.accounts.forEach(acc => {
             accountSelect.innerHTML += `<option value="${acc}">${acc}</option>`;
+            transferFrom.innerHTML += `<option value="${acc}">${acc}</option>`;
+            transferTo.innerHTML += `<option value="${acc}">${acc}</option>`;
             filterAccount.innerHTML += `<option value="${acc}">${acc}</option>`;
         });
+        if (ledgerState.accounts.length > 1) transferTo.selectedIndex = 1;
 
         // Retain selected filter account if it exists
         if (ledgerState.accounts.includes(prevFilterVal)) {
@@ -2112,6 +2158,13 @@
                 totalExpense += amount;
                 if (accountBalances[entry.account] !== undefined) {
                     accountBalances[entry.account] -= amount;
+                }
+            } else if (entry.type === 'transfer') {
+                if (accountBalances[entry.account] !== undefined) {
+                    accountBalances[entry.account] -= amount;
+                }
+                if (accountBalances[entry.transfer_account] !== undefined) {
+                    accountBalances[entry.transfer_account] += amount;
                 }
             }
         });
@@ -2171,28 +2224,30 @@
         // Filter operations
         const filteredEntries = ledgerState.entries.filter(entry => {
             const matchesType = filterType === 'all' || entry.type === filterType;
-            const matchesAcc = filterAcc === 'all' || entry.account === filterAcc;
+            const matchesAcc = filterAcc === 'all' || entry.account === filterAcc || entry.transfer_account === filterAcc;
             const matchesSearch = !filterSearch || 
                 (entry.category && entry.category.toLowerCase().includes(filterSearch)) ||
                 (entry.notes && entry.notes.toLowerCase().includes(filterSearch)) ||
-                (entry.account && entry.account.toLowerCase().includes(filterSearch));
+                (entry.account && entry.account.toLowerCase().includes(filterSearch)) ||
+                (entry.transfer_account && entry.transfer_account.toLowerCase().includes(filterSearch));
             
             return matchesType && matchesAcc && matchesSearch;
         });
 
         // Loop to render rows
         filteredEntries.forEach(entry => {
-            const badgeClass = entry.type === 'income' ? 'badge-income' : 'badge-expense';
-            const badgeText = entry.type === 'income' ? 'Income' : 'Expense';
-            const amountColor = entry.type === 'income' ? 'var(--accent-success)' : 'var(--accent-danger)';
-            const prefix = entry.type === 'income' ? '+' : '-';
+            const badgeClass = entry.type === 'income' ? 'badge-income' : entry.type === 'expense' ? 'badge-expense' : 'badge-transfer';
+            const badgeText = entry.type === 'income' ? 'Invest' : entry.type === 'expense' ? 'Expense' : 'Transfer';
+            const amountColor = entry.type === 'income' ? 'var(--accent-success)' : entry.type === 'expense' ? 'var(--accent-danger)' : 'var(--accent-primary)';
+            const prefix = entry.type === 'income' ? '+' : entry.type === 'expense' ? '-' : '';
+            const accountDisplay = entry.type === 'transfer' ? `${entry.account} → ${entry.transfer_account}` : entry.account;
 
             tbody.innerHTML += `
                 <tr>
                     <td class="display-font" style="white-space: nowrap;">${entry.date || ''}</td>
                     <td><span class="badge ${badgeClass}">${badgeText}</span></td>
                     <td><strong>${entry.category || 'N/A'}</strong></td>
-                    <td>${entry.account || 'N/A'}</td>
+                    <td>${accountDisplay || 'N/A'}</td>
                     <td class="display-font amount-col ${entry.type}" style="color: ${amountColor}; font-weight: 700; white-space: nowrap;">
                         ${prefix}${entry.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ৳
                     </td>
@@ -2217,11 +2272,14 @@
             // Calculate totals for footer
             let totalIncome = 0;
             let totalExpense = 0;
+            let totalTransfers = 0;
             filteredEntries.forEach(entry => {
                 if (entry.type === 'income') {
                     totalIncome += entry.amount;
-                } else {
+                } else if (entry.type === 'expense') {
                     totalExpense += entry.amount;
+                } else if (entry.type === 'transfer') {
+                    totalTransfers += entry.amount;
                 }
             });
             const netAmount = totalIncome - totalExpense;
@@ -2234,7 +2292,16 @@
             const netColor = netAmount >= 0 ? 'var(--accent-success)' : 'var(--accent-danger)';
             const netStr = `${netPrefix}${netAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ৳`;
 
-            if (filterType === 'income') {
+            if (filterType === 'transfer') {
+                const transferStr = `${totalTransfers.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ৳`;
+                totalHTML = `
+                    <tr style="border-top: 2px solid var(--border-color); background: rgba(0, 217, 255, 0.05);">
+                        <td colspan="4" style="text-align: right; font-weight: bold; font-size: 0.95rem;">Total Transfers:</td>
+                        <td style="color: var(--accent-primary); font-weight: bold; font-size: 0.95rem; white-space: nowrap;">${transferStr}</td>
+                        <td colspan="2"></td>
+                    </tr>
+                `;
+            } else if (filterType === 'income') {
                 totalHTML = `
                     <tr style="border-top: 2px solid var(--border-color); background: rgba(16, 185, 129, 0.05);">
                         <td colspan="4" style="text-align: right; font-weight: bold; font-size: 0.95rem;">Total Income:</td>
@@ -2275,6 +2342,8 @@
             filteredEntries = ledgerState.entries.filter(e => e.type === 'income');
         } else if (typeFilter === 'expense') {
             filteredEntries = ledgerState.entries.filter(e => e.type === 'expense');
+        } else if (typeFilter === 'transfer') {
+            filteredEntries = ledgerState.entries.filter(e => e.type === 'transfer');
         }
 
         if (filteredEntries.length === 0) {
@@ -2285,9 +2354,9 @@
         let csvContent = "Date,Type,Source/Sector,Account,Amount,Description\n";
         filteredEntries.forEach(entry => {
             const date = entry.date || '';
-            const type = entry.type === 'income' ? 'Income' : 'Expense';
+            const type = entry.type === 'income' ? 'Invest' : entry.type === 'expense' ? 'Expense' : 'Transfer';
             const sourceOrSector = entry.category || '';
-            const account = entry.account || '';
+            const account = entry.type === 'transfer' ? `${entry.account} -> ${entry.transfer_account}` : entry.account || '';
             const amount = entry.amount || 0;
             const description = (entry.notes || '').replace(/"/g, '""');
 

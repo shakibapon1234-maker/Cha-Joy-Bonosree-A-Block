@@ -5,14 +5,25 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.ledger_entries (
     id uuid primary key default gen_random_uuid(),
-    type text not null check (type in ('income', 'expense')),
+    type text not null check (type in ('income', 'expense', 'transfer')),
     amount numeric(14, 2) not null check (amount > 0),
     category text not null,
     account text not null,
+    transfer_account text,
     date date not null default current_date,
     notes text not null default 'No description',
     created_at timestamptz not null default now()
 );
+
+alter table public.ledger_entries
+    add column if not exists transfer_account text;
+
+alter table public.ledger_entries
+    drop constraint if exists ledger_entries_type_check;
+
+alter table public.ledger_entries
+    add constraint ledger_entries_type_check
+    check (type in ('income', 'expense', 'transfer'));
 
 create table if not exists public.ledger_sources (
     id uuid primary key default gen_random_uuid(),

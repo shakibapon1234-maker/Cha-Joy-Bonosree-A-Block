@@ -187,6 +187,20 @@
             margin-bottom: 25px;
         }
 
+        .integrity-warning {
+            margin: -8px 0 25px;
+            padding: 14px 18px;
+            border: 1px solid rgba(239, 68, 68, 0.55);
+            border-radius: 10px;
+            background: rgba(127, 29, 29, 0.28);
+            color: #fecaca;
+            line-height: 1.5;
+        }
+
+        .integrity-warning[hidden] {
+            display: none;
+        }
+
         .stat-card {
             backdrop-filter: blur(10px);
             border-radius: 16px;
@@ -1313,6 +1327,7 @@
                 <div class="stat-value display-font"><span id="total-balance">0.00</span> ৳</div>
             </div>
         </div>
+        <div id="integrity-warning" class="integrity-warning" role="alert" aria-live="polite" hidden></div>
 
         <!-- Dashboard body -->
         <div class="dashboard-content">
@@ -2140,6 +2155,9 @@
     function renderStatsAndBalances() {
         let totalIncome = 0;
         let totalExpense = 0;
+        const warnings = [];
+        const unconfiguredAccounts = new Set();
+        let invalidEntryCount = 0;
         
         // Object to accumulate account-wise balances
         const accountBalances = {};
@@ -2148,28 +2166,63 @@
         });
 
         ledgerState.entries.forEach(entry => {
-            const amount = entry.amount || 0;
+            const amount = Number(entry.amount);
+            if (!Number.isFinite(amount) || amount <= 0) {
+                invalidEntryCount++;
+                return;
+            }
+
             if (entry.type === 'income') {
                 totalIncome += amount;
                 if (accountBalances[entry.account] !== undefined) {
                     accountBalances[entry.account] += amount;
+                } else {
+                    unconfiguredAccounts.add(entry.account || '(blank)');
                 }
             } else if (entry.type === 'expense') {
                 totalExpense += amount;
                 if (accountBalances[entry.account] !== undefined) {
                     accountBalances[entry.account] -= amount;
+                } else {
+                    unconfiguredAccounts.add(entry.account || '(blank)');
                 }
             } else if (entry.type === 'transfer') {
+                if (!entry.account || !entry.transfer_account || entry.account === entry.transfer_account) {
+                    warnings.push(`Invalid transfer found: ${entry.account || '(missing source)'} → ${entry.transfer_account || '(missing destination)'}.`);
+                }
                 if (accountBalances[entry.account] !== undefined) {
                     accountBalances[entry.account] -= amount;
+                } else {
+                    unconfiguredAccounts.add(entry.account || '(blank)');
                 }
                 if (accountBalances[entry.transfer_account] !== undefined) {
                     accountBalances[entry.transfer_account] += amount;
+                } else {
+                    unconfiguredAccounts.add(entry.transfer_account || '(blank)');
                 }
+            } else {
+                warnings.push(`Unsupported transaction type found: ${entry.type || '(blank)'}.`);
             }
         });
 
         const totalBalance = totalIncome - totalExpense;
+        const accountBalanceTotal = Object.values(accountBalances).reduce((sum, amount) => sum + amount, 0);
+        const balanceDifference = accountBalanceTotal - totalBalance;
+        if (Math.abs(balanceDifference) >= 0.005) {
+            warnings.push(`Account balances total ${accountBalanceTotal.toFixed(2)} ৳, but investments minus expenses is ${totalBalance.toFixed(2)} ৳ (difference ${balanceDifference.toFixed(2)} ৳).`);
+        }
+        if (unconfiguredAccounts.size > 0) {
+            warnings.push(`Transactions use account(s) missing from settings: ${Array.from(unconfiguredAccounts).join(', ')}.`);
+        }
+        if (invalidEntryCount > 0) {
+            warnings.push(`${invalidEntryCount} transaction(s) have an invalid amount.`);
+        }
+
+        const integrityWarning = document.getElementById('integrity-warning');
+        integrityWarning.textContent = warnings.length
+            ? `Ledger check warning: ${warnings.join(' ')} Please review the transactions and account settings.`
+            : '';
+        integrityWarning.hidden = warnings.length === 0;
 
         // Render to DOM
         document.getElementById('total-income').textContent = totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

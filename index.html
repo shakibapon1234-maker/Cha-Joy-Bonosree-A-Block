@@ -1696,7 +1696,15 @@
         }
 
         try {
-            supabaseClient = supabase.createClient(dbUrl, dbKey);
+            if (!supabaseClient) {
+                supabaseClient = supabase.createClient(dbUrl, dbKey, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: true
+                    }
+                });
+            }
         } catch (err) {
             showToast('Invalid Supabase configuration parameters.', 'danger');
             document.getElementById('db-config-screen').style.display = 'flex';
@@ -1705,17 +1713,28 @@
 
         // 2. Check Authentication Session
         showLoading(true, 'Initializing...');
-        const { data: { session }, error } = await supabaseClient.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
 
-        if (error || !session) {
+        if (sessionError || !session) {
             showLoading(false);
+            document.getElementById('auth-screen').style.display = 'flex';
+            return;
+        }
+
+        // Validate session with server to detect expired or revoked tokens
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+        if (userError || !user) {
+            console.warn('Session expired or invalidated:', userError);
+            await supabaseClient.auth.signOut();
+            showLoading(false);
+            showToast('লগইন সেশনের মেয়াদ শেষ হয়ে গেছে। অনুগ্রহ করে আবার লগইন করুন।', 'danger');
             document.getElementById('auth-screen').style.display = 'flex';
             return;
         }
 
         // 3. User is logged in, initialize dashboard
         document.getElementById('main-app').style.display = 'block';
-        document.getElementById('header-user-email').textContent = session.user.email;
+        document.getElementById('header-user-email').textContent = (user && user.email) || session.user.email;
         document.getElementById('entry-date').valueAsDate = new Date();
         
         try {
@@ -1863,8 +1882,16 @@
                 supabaseClient.from('ledger_accounts').select('name')
             ]);
 
-            if (entriesRes.error || sourcesRes.error || categoriesRes.error || accountsRes.error) {
-                throw new Error('Database fetch error.');
+            const fetchError = entriesRes.error || sourcesRes.error || categoriesRes.error || accountsRes.error;
+            if (fetchError) {
+                if (fetchError.status === 401 || fetchError.code === 'PGRST301' || (fetchError.message && fetchError.message.toLowerCase().includes('jwt'))) {
+                    console.warn('Session expired during sync:', fetchError);
+                    await supabaseClient.auth.signOut();
+                    showToast('লগইন সেশনের মেয়াদ শেষ হয়ে গেছে। অনুগ্রহ করে আবার লগইন করুন।', 'danger');
+                    init();
+                    return;
+                }
+                throw fetchError;
             }
 
             ledgerState.entries = entriesRes.data || [];
@@ -1882,6 +1909,7 @@
 
             renderAll();
         } catch (err) {
+            console.error('Fetch error:', err);
             showToast('Failed to fetch data from cloud database.', 'danger');
         } finally {
             if (showSpinner) showLoading(false);

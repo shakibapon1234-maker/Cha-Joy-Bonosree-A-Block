@@ -1153,6 +1153,15 @@
                             </select>
                         </div>
                         <div>
+                            <label class="form-label" style="font-size: 0.85rem;">
+                                <i class="fa-solid fa-user-tag" style="color: var(--accent-primary); margin-right: 4px;"></i> Investor / Individual
+                            </label>
+                            <select id="filter-person" class="input-control" style="padding: 8px 12px;" onchange="renderAll()">
+                                <option value="all">All Individuals / Investors</option>
+                                <!-- Dynamic options -->
+                            </select>
+                        </div>
+                        <div>
                             <label class="form-label" style="font-size: 0.85rem;">Payment Method</label>
                             <select id="filter-account" class="input-control" style="padding: 8px 12px;" onchange="renderAll()">
                                 <option value="all">All Accounts</option>
@@ -1160,8 +1169,30 @@
                             </select>
                         </div>
                         <div>
-                            <label class="form-label" style="font-size: 0.85rem;">Search (Notes / Source / Sector)</label>
+                            <label class="form-label" style="font-size: 0.85rem;">Search (Notes / Sector / Any)</label>
                             <input type="text" id="filter-search" class="input-control" placeholder="Type keyword..." style="padding: 8px 12px;" oninput="renderAll()">
+                        </div>
+                    </div>
+
+                    <!-- Individual Filter Banner (Appears when a specific individual is selected) -->
+                    <div id="individual-summary-banner" style="display: none; margin-top: -10px; margin-bottom: 18px; padding: 12px 18px; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <span style="background: var(--accent-primary); color: #0a0e27; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.85rem;">
+                                <i class="fa-solid fa-user-check"></i> Individual Statement
+                            </span>
+                            <span id="individual-name-display" style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);"></span>
+                            <span id="individual-stats-display" style="color: var(--text-muted); font-size: 0.9rem;"></span>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn" onclick="exportIndividualStatement()" style="width: auto; padding: 6px 14px; font-size: 0.85rem; background: var(--accent-success); border: 1px solid var(--accent-success); color: #0a0e27; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-file-arrow-down"></i> Export Statement (CSV)
+                            </button>
+                            <button class="btn" onclick="printLedger()" style="width: auto; padding: 6px 14px; font-size: 0.85rem; background: #b537f2; border: 1px solid #b537f2; color: #f8fafc; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-print"></i> Print Statement
+                            </button>
+                            <button class="btn" onclick="resetIndividualFilter()" style="width: auto; padding: 6px 12px; font-size: 0.85rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-xmark"></i> Show All
+                            </button>
                         </div>
                     </div>
 
@@ -1580,6 +1611,29 @@
         } else {
             filterAccount.value = 'all';
         }
+
+        // Populate Investor / Individual Filter Dropdown
+        const filterPerson = document.getElementById('filter-person');
+        if (filterPerson) {
+            const prevPersonVal = filterPerson.value;
+            const personSet = new Set();
+            (ledgerState.sources || []).forEach(s => { if (s && s.trim()) personSet.add(s.trim()); });
+            (ledgerState.entries || []).forEach(e => {
+                if (e.type === 'income' && e.category && e.category.trim()) {
+                    personSet.add(e.category.trim());
+                }
+            });
+            const personList = Array.from(personSet).sort((a, b) => a.localeCompare(b));
+            filterPerson.innerHTML = '<option value="all">All Individuals / Investors</option>';
+            personList.forEach(person => {
+                filterPerson.innerHTML += `<option value="${person}">${person}</option>`;
+            });
+            if (prevPersonVal && (prevPersonVal === 'all' || personList.includes(prevPersonVal))) {
+                filterPerson.value = prevPersonVal;
+            } else {
+                filterPerson.value = 'all';
+            }
+        }
     }
 
     // Render Stats (Income, Expense, Balance) and Account-wise breakdown
@@ -1699,6 +1753,7 @@
     // Render Ledger Transaction Table with Filters and Searches
     function renderLedgerTable() {
         const filterType = document.getElementById('filter-type').value;
+        const filterPerson = document.getElementById('filter-person') ? document.getElementById('filter-person').value : 'all';
         const filterAcc = document.getElementById('filter-account').value;
         const filterSearch = document.getElementById('filter-search').value.toLowerCase().trim();
 
@@ -1709,14 +1764,47 @@
         const filteredEntries = ledgerState.entries.filter(entry => {
             const matchesType = filterType === 'all' || entry.type === filterType;
             const matchesAcc = filterAcc === 'all' || entry.account === filterAcc || entry.transfer_account === filterAcc;
+
+            // Individual / Investor filter
+            let matchesPerson = true;
+            if (filterPerson !== 'all') {
+                const target = filterPerson.toLowerCase();
+                const catMatch = entry.category && entry.category.toLowerCase() === target;
+                const notesMatch = entry.notes && entry.notes.toLowerCase().includes(target);
+                matchesPerson = catMatch || notesMatch;
+            }
+
             const matchesSearch = !filterSearch || 
                 (entry.category && entry.category.toLowerCase().includes(filterSearch)) ||
                 (entry.notes && entry.notes.toLowerCase().includes(filterSearch)) ||
                 (entry.account && entry.account.toLowerCase().includes(filterSearch)) ||
                 (entry.transfer_account && entry.transfer_account.toLowerCase().includes(filterSearch));
             
-            return matchesType && matchesAcc && matchesSearch;
+            return matchesType && matchesAcc && matchesPerson && matchesSearch;
         });
+
+        // Update Individual Summary Banner
+        const summaryBanner = document.getElementById('individual-summary-banner');
+        if (summaryBanner) {
+            if (filterPerson !== 'all') {
+                summaryBanner.style.display = 'flex';
+                document.getElementById('individual-name-display').textContent = filterPerson;
+                let indIncome = 0;
+                let indExpense = 0;
+                filteredEntries.forEach(e => {
+                    if (e.type === 'income') indIncome += e.amount;
+                    else if (e.type === 'expense') indExpense += e.amount;
+                });
+                const count = filteredEntries.length;
+                let statsText = `(${count} transaction${count === 1 ? '' : 's'}) — Total Invested: +${indIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ৳`;
+                if (indExpense > 0) {
+                    statsText += ` | Total Expense: -${indExpense.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ৳`;
+                }
+                document.getElementById('individual-stats-display').textContent = statsText;
+            } else {
+                summaryBanner.style.display = 'none';
+            }
+        }
 
         // Loop to render rows
         filteredEntries.forEach(entry => {
@@ -1726,11 +1814,22 @@
             const prefix = entry.type === 'income' ? '+' : entry.type === 'expense' ? '-' : '';
             const accountDisplay = entry.type === 'transfer' ? `${entry.account} → ${entry.transfer_account}` : entry.account;
 
+            const safeCategory = (entry.category || '').replace(/'/g, "\\'");
+            const isClickablePerson = entry.type === 'income' && entry.category;
+            const categoryHTML = isClickablePerson ? `
+                <span 
+                    style="cursor: pointer; color: var(--accent-primary); text-decoration: underline dotted; text-underline-offset: 3px;" 
+                    onclick="filterByIndividual('${safeCategory}')" 
+                    title="Click to view only ${entry.category}'s transactions">
+                    <strong>${entry.category}</strong> <i class="fa-solid fa-filter" style="font-size: 0.72rem; opacity: 0.7; margin-left: 2px;"></i>
+                </span>
+            ` : `<strong>${entry.category || 'N/A'}</strong>`;
+
             tbody.innerHTML += `
                 <tr>
                     <td class="display-font" style="white-space: nowrap;">${entry.date || ''}</td>
                     <td><span class="badge ${badgeClass}">${badgeText}</span></td>
-                    <td><strong>${entry.category || 'N/A'}</strong></td>
+                    <td>${categoryHTML}</td>
                     <td>${accountDisplay || 'N/A'}</td>
                     <td class="display-font amount-col ${entry.type}" style="color: ${amountColor}; font-weight: 700; white-space: nowrap;">
                         ${prefix}${entry.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ৳
@@ -1746,9 +1845,12 @@
         });
 
         if (filteredEntries.length === 0) {
+            const emptyMsg = filterPerson !== 'all' 
+                ? `No transactions found for individual "${filterPerson}".` 
+                : 'No matching transactions found in the ledger.';
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="empty-text">No matching transactions found in the ledger.</td>
+                    <td colspan="7" class="empty-text">${emptyMsg}</td>
                 </tr>
             `;
             document.getElementById('ledger-tfoot').innerHTML = '';
@@ -1776,7 +1878,19 @@
             const netColor = netAmount >= 0 ? 'var(--accent-success)' : 'var(--accent-danger)';
             const netStr = `${netPrefix}${netAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ৳`;
 
-            if (filterType === 'transfer') {
+            if (filterPerson !== 'all') {
+                totalHTML = `
+                    <tr style="border-top: 2px solid var(--border-color); background: rgba(99, 102, 241, 0.08);">
+                        <td colspan="4" style="text-align: right; font-weight: bold; font-size: 0.95rem;">
+                            <i class="fa-solid fa-user-tag" style="color: var(--accent-primary); margin-right: 6px;"></i> Total for ${filterPerson}:
+                        </td>
+                        <td style="color: ${netColor}; font-weight: bold; font-size: 1rem; white-space: nowrap;">${netStr}</td>
+                        <td colspan="2" style="font-size: 0.85rem; color: var(--text-muted); font-style: italic;">
+                            (${filteredEntries.length} record${filteredEntries.length === 1 ? '' : 's'})
+                        </td>
+                    </tr>
+                `;
+            } else if (filterType === 'transfer') {
                 const transferStr = `${totalTransfers.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ৳`;
                 totalHTML = `
                     <tr style="border-top: 2px solid var(--border-color); background: rgba(0, 217, 255, 0.05);">
@@ -1817,6 +1931,79 @@
             }
             tfoot.innerHTML = totalHTML;
         }
+    }
+
+    // Helper functions for individual filtering & exporting
+    function filterByIndividual(name) {
+        if (!name || name === 'N/A') return;
+        const filterPerson = document.getElementById('filter-person');
+        if (filterPerson) {
+            filterPerson.value = name;
+            renderAll();
+            const tableEl = document.getElementById('ledger-table');
+            if (tableEl) tableEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            showToast(`Filtered for: ${name}`);
+        }
+    }
+
+    function resetIndividualFilter() {
+        const filterPerson = document.getElementById('filter-person');
+        if (filterPerson) {
+            filterPerson.value = 'all';
+            renderAll();
+            showToast('Showing all transactions');
+        }
+    }
+
+    function exportIndividualStatement() {
+        const filterPerson = document.getElementById('filter-person') ? document.getElementById('filter-person').value : 'all';
+        if (filterPerson === 'all') {
+            exportCSV('all');
+            return;
+        }
+
+        const target = filterPerson.toLowerCase();
+        const indEntries = ledgerState.entries.filter(entry => {
+            return (entry.category && entry.category.toLowerCase() === target) ||
+                   (entry.notes && entry.notes.toLowerCase().includes(target));
+        });
+
+        if (indEntries.length === 0) {
+            showToast(`No records found for ${filterPerson}`, 'danger');
+            return;
+        }
+
+        let csvContent = `Individual Statement: ${filterPerson}\n`;
+        csvContent += `Generated On: ${new Date().toLocaleString('en-US')}\n\n`;
+        csvContent += "Date,Type,Source/Sector,Account,Amount,Description\n";
+
+        let totalAmount = 0;
+        indEntries.forEach(entry => {
+            const date = entry.date || '';
+            const type = entry.type === 'income' ? 'Invest' : entry.type === 'expense' ? 'Expense' : 'Transfer';
+            const sourceOrSector = (entry.category || '').replace(/"/g, '""');
+            const account = entry.type === 'transfer' ? `${entry.account} -> ${entry.transfer_account}` : (entry.account || '');
+            const amount = entry.amount || 0;
+            if (entry.type === 'income') totalAmount += amount;
+            else if (entry.type === 'expense') totalAmount -= amount;
+            const description = (entry.notes || '').replace(/"/g, '""');
+
+            csvContent += `"${date}","${type}","${sourceOrSector}","${account}",${amount},"${description}"\n`;
+        });
+
+        const netPrefix = totalAmount >= 0 ? '+' : '';
+        csvContent += `\nNet Total,,,,,${netPrefix}${totalAmount}\n`;
+
+        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        const safeName = filterPerson.replace(/[^a-zA-Z0-9_\u0980-\u09FF]/g, '_');
+        link.setAttribute("download", `statement_${safeName}_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast(`Statement exported for ${filterPerson}!`);
     }
 
     // Export CSV and Print functions
@@ -1876,6 +2063,17 @@
         
         dateElements.forEach(el => el.textContent = nowStr);
         userElements.forEach(el => el.textContent = userEmail);
+
+        // Customize subtitle when an individual statement is being printed
+        const filterPerson = document.getElementById('filter-person') ? document.getElementById('filter-person').value : 'all';
+        const printSubTitle = document.querySelector('.print-title-area p');
+        if (printSubTitle) {
+            if (filterPerson !== 'all') {
+                printSubTitle.textContent = `Individual Statement: ${filterPerson}`;
+            } else {
+                printSubTitle.textContent = 'Ledger Account Management Report';
+            }
+        }
         
         window.print();
     }

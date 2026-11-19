@@ -174,6 +174,51 @@
             display: none;
         }
 
+        /* ══════════ SYNC GUARD BANNER ══════════ */
+        #sync-guard-banner {
+            display: none;
+            margin: 0 0 18px;
+            padding: 14px 18px;
+            border: 1.5px solid rgba(239, 68, 68, 0.75);
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(127,29,29,0.45), rgba(239,68,68,0.12));
+            color: #fecaca;
+            font-size: 0.88rem;
+            line-height: 1.6;
+            animation: syncGuardPulse 2.5s ease-in-out infinite;
+        }
+        #sync-guard-banner.has-issues {
+            display: block;
+        }
+        @keyframes syncGuardPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+            50%       { box-shadow: 0 0 0 6px rgba(239,68,68,0.18); }
+        }
+        #sync-guard-banner .sg-title {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #f87171;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #sync-guard-banner .sg-issue {
+            padding: 5px 10px;
+            margin: 4px 0;
+            border-left: 3px solid #ef4444;
+            background: rgba(239,68,68,0.08);
+            border-radius: 0 6px 6px 0;
+            font-size: 0.83rem;
+            color: #fca5a5;
+        }
+        #sync-guard-banner .sg-hint {
+            margin-top: 10px;
+            font-size: 0.78rem;
+            color: #94a3b8;
+            font-style: italic;
+        }
+
         .stat-card {
             backdrop-filter: blur(10px);
             border-radius: 16px;
@@ -1252,6 +1297,7 @@
                 <div class="stat-value display-font"><span id="total-balance">0.00</span> ৳</div>
             </div>
         </div>
+        <div id="sync-guard-banner" role="alert" aria-live="assertive"></div>
         <div id="integrity-warning" class="integrity-warning" role="alert" aria-live="polite" hidden></div>
 
         <!-- Dashboard body -->
@@ -2222,7 +2268,126 @@
     });
 
     // Main Renderer
+    // ══════════════════════════════════════════════════════
+    // SYNC GUARD — Runs on every renderAll(), catches ALL
+    // name mismatches, orphan entries, source drift, and
+    // data integrity issues BEFORE they cause silent errors.
+    // ══════════════════════════════════════════════════════
+    function runSyncGuard() {
+        const banner = document.getElementById('sync-guard-banner');
+        if (!banner) return;
+
+        const issues = [];
+
+        // ── Helper ──────────────────────────────────────────
+        function norm(n) {
+            return (n || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        }
+        const shNames    = SHAREHOLDERS.map(s => s.name);
+        const shNormMap  = {};
+        SHAREHOLDERS.forEach(sh => { shNormMap[norm(sh.name)] = sh.name; });
+
+        // ── GUARD 1: Income entries whose category doesn't
+        //    match any shareholder (name mismatch) ──────────
+        const unmatchedIncome = {};
+        (ledgerState.entries || []).forEach(e => {
+            if (e.type !== 'income') return;
+            const catNorm = norm(e.category);
+            if (!shNormMap[catNorm]) {
+                const label = (e.category || '(blank)').trim();
+                unmatchedIncome[label] = (unmatchedIncome[label] || 0) + Number(e.amount);
+            }
+        });
+        Object.keys(unmatchedIncome).forEach(label => {
+            const amt = unmatchedIncome[label];
+            const suggestion = shNames.find(n =>
+                norm(n).split(' ').some(word => norm(label).includes(word))
+            );
+            issues.push(
+                `🔴 নাম মিলছে না: Income entry-তে <strong>"${label}"</strong> আছে কিন্তু কোনো Shareholder-এ নেই।` +
+                ` টাকা: <strong>+${amt.toLocaleString('en-US',{minimumFractionDigits:2})} ৳</strong>` +
+                (suggestion ? ` → কি <strong>"${suggestion}"</strong> বলতে চেয়েছিলেন?` : '') +
+                ` <span style="color:#94a3b8;font-size:0.78rem;">[Entry Edit করুন → Source ঠিক করুন]</span>`
+            );
+        });
+
+        // ── GUARD 2: Sources list missing a shareholder name ──
+        SHAREHOLDERS.forEach(sh => {
+            const hasInSources = (ledgerState.sources || []).some(s => norm(s) === norm(sh.name));
+            if (!hasInSources) {
+                issues.push(
+                    `🟡 Source তালিকায় <strong>"${sh.name}"</strong> নেই।` +
+                    ` ফলে নতুন Entry যোগ করার সময় dropdown-এ এই নাম থাকবে না।` +
+                    ` Settings → Income Sources-এ যোগ করুন।`
+                );
+            }
+        });
+
+        // ── GUARD 3: Duplicate-ish source names ──────────────
+        const seen = new Set();
+        (ledgerState.sources || []).forEach(src => {
+            const n = norm(src);
+            if (seen.has(n)) {
+                issues.push(
+                    `🟡 Source তালিকায় <strong>"${src}"</strong> নাম দুবার আছে (duplicate)।` +
+                    ` Settings → Income Sources থেকে একটি মুছুন।`
+                );
+            }
+            seen.add(n);
+        });
+
+        // ── GUARD 4: Entries with blank/null category ────────
+        const blankCatCount = (ledgerState.entries || []).filter(
+            e => e.type === 'income' && (!e.category || !e.category.trim())
+        ).length;
+        if (blankCatCount > 0) {
+            issues.push(
+                `🔴 <strong>${blankCatCount}টি</strong> Income entry-র Source/Category খালি (blank)।` +
+                ` Ledger-এ গিয়ে Edit করে Source যোগ করুন।`
+            );
+        }
+
+        // ── GUARD 5: Entries with negative or zero amount ────
+        const badAmtCount = (ledgerState.entries || []).filter(
+            e => !(Number(e.amount) > 0)
+        ).length;
+        if (badAmtCount > 0) {
+            issues.push(
+                `🟡 <strong>${badAmtCount}টি</strong> Entry-র Amount ০ বা ঋণাত্মক — এগুলো হিসাবে ধরা হচ্ছে না।`
+            );
+        }
+
+        // ── GUARD 6: Transfer entries with same from/to ──────
+        const badTransfers = (ledgerState.entries || []).filter(
+            e => e.type === 'transfer' && e.account && e.account === e.transfer_account
+        ).length;
+        if (badTransfers > 0) {
+            issues.push(
+                `🟡 <strong>${badTransfers}টি</strong> Transfer entry-তে From এবং To একই Account — এটা সমস্যা।`
+            );
+        }
+
+        // ── Render Banner ─────────────────────────────────────
+        if (issues.length === 0) {
+            banner.classList.remove('has-issues');
+            banner.innerHTML = '';
+        } else {
+            banner.classList.add('has-issues');
+            banner.innerHTML = `
+                <div class="sg-title">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    ⚠️ Sync Guard সতর্কবার্তা — ${issues.length}টি সমস্যা পাওয়া গেছে
+                </div>
+                ${issues.map(i => `<div class="sg-issue">${i}</div>`).join('')}
+                <div class="sg-hint">
+                    💡 উপরের সমস্যাগুলো ঠিক না করলে Shareholder card-এ ভুল টাকা দেখাবে এবং Ledger export ভুল হবে।
+                </div>
+            `;
+        }
+    }
+
     function renderAll() {
+        runSyncGuard();
         renderShareholders();
         renderFormDropdowns();
         renderStatsAndBalances();

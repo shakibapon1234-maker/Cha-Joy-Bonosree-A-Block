@@ -2691,6 +2691,68 @@
         renderLedgerTable();
     }
 
+    // ── Global normalize helper ───────────────────────────
+    function normName(n) { return (n || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+
+    // ── Find best-matching SHAREHOLDER for a given name ──
+    function findBestShareholder(catName) {
+        const catNorm = normName(catName);
+        // exact match
+        const exact = SHAREHOLDERS.find(sh => normName(sh.name) === catNorm);
+        if (exact) return exact.name;
+        // word-overlap score
+        const catWords = catNorm.split(' ').filter(Boolean);
+        let bestScore = 0, bestMatch = null;
+        SHAREHOLDERS.forEach(sh => {
+            const shWords = normName(sh.name).split(' ').filter(Boolean);
+            const score = catWords.filter(w => shWords.some(sw => sw.includes(w) || w.includes(sw))).length;
+            if (score > bestScore) { bestScore = score; bestMatch = sh.name; }
+        });
+        return bestScore >= 1 ? bestMatch : null;
+    }
+
+    // ── Auto-fix mismatched income entries in Supabase ───
+    async function autoFixMismatchedEntries() {
+        const toFix = [];
+        (ledgerState.entries || []).forEach(e => {
+            if (e.type !== 'income') return;
+            const catNorm = normName(e.category);
+            const shNormMap = {};
+            SHAREHOLDERS.forEach(sh => { shNormMap[normName(sh.name)] = sh.name; });
+            if (shNormMap[catNorm]) return; // already correct
+            const suggestion = findBestShareholder(e.category);
+            if (suggestion) toFix.push({ entry: e, suggestion });
+        });
+
+        if (toFix.length === 0) {
+            showToast('সব entry ইতিমধ্যে ঠিক আছে। কিছু fix করার নেই।');
+            return;
+        }
+
+        const summary = toFix.map(f =>
+            `"${f.entry.category}" → "${f.suggestion}" (${f.entry.date || 'no date'}, ${Number(f.entry.amount).toLocaleString('en-US')} ৳)`
+        ).join('\n');
+
+        if (!confirm(`${toFix.length}টি Income entry auto-fix করা হবে:\n\n${summary}\n\nConfirm করুন?`)) return;
+
+        showLoading(true, `Auto-fixing ${toFix.length} entries...`);
+        let fixedCount = 0;
+        for (const { entry, suggestion } of toFix) {
+            const { error } = await supabaseClient.from('ledger_entries')
+                .update({ category: suggestion })
+                .eq('id', entry.id);
+            if (!error) fixedCount++;
+        }
+        showLoading(false);
+
+        if (fixedCount > 0) {
+            showToast(`✅ ${fixedCount}টি entry সফলভাবে fix হয়েছে!`);
+            await syncDataFromDatabase();
+        } else {
+            showToast('Fix করা যায়নি। আবার চেষ্টা করুন।', 'danger');
+        }
+    }
+
     // Populate dropdowns inside Edit modal
     function populateEditDropdowns(entry) {
         const sourceSelect = document.getElementById('edit-entry-source');
@@ -2699,22 +2761,34 @@
         const transferFrom = document.getElementById('edit-entry-transfer-from');
         const transferTo = document.getElementById('edit-entry-transfer-to');
 
-        // Combined sources
-        const sources = [...ledgerState.sources];
-        SHAREHOLDERS.forEach(sh => {
-            if (!sources.some(s => s.toLowerCase() === sh.name.toLowerCase())) {
-                sources.push(sh.name);
-            }
-        });
-        if (entry.category && !sources.some(s => s.toLowerCase() === entry.category.toLowerCase())) {
-            sources.push(entry.category);
-        }
+        // Income source: SHAREHOLDERS first (canonical names from array),
+        // then non-shareholder sources from DB — NEVER show a source that
+        // "looks like" a shareholder by a different spelling.
+        const shNormSet = new Set(SHAREHOLDERS.map(sh => normName(sh.name)));
         sourceSelect.innerHTML = '';
-        sources.forEach(src => {
+
+        // 1. All shareholders (always use the name from SHAREHOLDERS array)
+        SHAREHOLDERS.forEach(sh => {
+            const opt = document.createElement('option');
+            opt.value = sh.name;
+            opt.textContent = sh.name + ' (শেয়ারহোল্ডার)';
+            // Select if entry category matches this shareholder (even if spellings differ)
+            if (entry.type === 'income' && entry.category &&
+                (normName(entry.category) === normName(sh.name) ||
+                 findBestShareholder(entry.category) === sh.name)) {
+                opt.selected = true;
+            }
+            sourceSelect.appendChild(opt);
+        });
+
+        // 2. Non-shareholder sources from DB
+        (ledgerState.sources || []).forEach(src => {
+            if (shNormSet.has(normName(src))) return; // skip shareholder-sounding names
             const opt = document.createElement('option');
             opt.value = src;
             opt.textContent = src;
-            if (entry.type === 'income' && entry.category && entry.category.toLowerCase() === src.toLowerCase()) {
+            if (entry.type === 'income' && entry.category &&
+                normName(entry.category) === normName(src)) {
                 opt.selected = true;
             }
             sourceSelect.appendChild(opt);
@@ -2876,20 +2950,17 @@
 
         const issues = [];
 
-        // ── Helper ──────────────────────────────────────────
-        function norm(n) {
-            return (n || '').toLowerCase().replace(/\s+/g, ' ').trim();
-        }
-        const shNames    = SHAREHOLDERS.map(s => s.name);
+        // ── Helper (uses global normName) ───────────────────
         const shNormMap  = {};
-        SHAREHOLDERS.forEach(sh => { shNormMap[norm(sh.name)] = sh.name; });
+        SHAREHOLDERS.forEach(sh => { shNormMap[normName(sh.name)] = sh.name; });
 
         // ── GUARD 1: Income entries whose category doesn't
         //    match any shareholder (name mismatch) ──────────
         const unmatchedIncome = {};
+        let hasAutoFixable = false;
         (ledgerState.entries || []).forEach(e => {
             if (e.type !== 'income') return;
-            const catNorm = norm(e.category);
+            const catNorm = normName(e.category);
             if (!shNormMap[catNorm]) {
                 const label = (e.category || '(blank)').trim();
                 unmatchedIncome[label] = (unmatchedIncome[label] || 0) + Number(e.amount);
@@ -2897,53 +2968,24 @@
         });
         Object.keys(unmatchedIncome).forEach(label => {
             const amt = unmatchedIncome[label];
-            // Suggest closest shareholder name
-            const suggestion = shNames.find(n =>
-                norm(n).split(' ').some(word => norm(label).includes(word))
-            );
+            const suggestion = findBestShareholder(label);
+            if (suggestion) hasAutoFixable = true;
             issues.push(
                 `🔴 নাম মিলছে না: Income entry-তে <strong>"${label}"</strong> আছে কিন্তু কোনো Shareholder-এ নেই।` +
                 ` টাকা: <strong>+${amt.toLocaleString('en-US',{minimumFractionDigits:2})} ৳</strong>` +
-                (suggestion ? ` → কি <strong>"${suggestion}"</strong> বলতে চেয়েছিলেন?` : '') +
-                ` <span style="color:#94a3b8;font-size:0.78rem;">[Entry Edit করুন → Source ঠিক করুন]</span>`
+                (suggestion ? ` → কি <strong>"${suggestion}"</strong> বলতে চেয়েছিলেন?` : '')
             );
         });
 
-        // ── GUARD 2: Shareholder names in DB sources list
-        //    that don't match SHAREHOLDERS array ────────────
-        (ledgerState.sources || []).forEach(src => {
-            const srcNorm = norm(src);
-            const isShName = shNames.some(n => norm(n) === srcNorm);
-            if (!isShName) return; // non-shareholder source, OK
-            // It looks like a shareholder name but doesn't exactly match
-            const exactMatch = shNormMap[srcNorm];
-            if (!exactMatch) {
-                issues.push(
-                    `🟡 Source তালিকায় <strong>"${src}"</strong> আছে কিন্তু Shareholder list-এ নেই।` +
-                    ` Settings → Income Sources থেকে মুছে সঠিক নামটি যোগ করুন।`
-                );
-            }
-        });
-
-        // ── GUARD 3: Sources list missing a shareholder name
-        //    (means dropdown won't have that name) ──────────
-        SHAREHOLDERS.forEach(sh => {
-            const hasInSources = (ledgerState.sources || []).some(s => norm(s) === norm(sh.name));
-            if (!hasInSources) {
-                issues.push(
-                    `🟡 Source তালিকায় <strong>"${sh.name}"</strong> নেই।` +
-                    ` ফলে নতুন Entry যোগ করার সময় dropdown-এ এই নাম থাকবে না।` +
-                    ` Settings → Income Sources-এ যোগ করুন।`
-                );
-            }
-        });
+        // ── GUARD 2 & 3: REMOVED ─────────────────────────────
+        // Income dropdown এখন সরাসরি SHAREHOLDERS array থেকে নেয়,
+        // তাই DB sources-এর সাথে মেলানোর দরকার নেই।
 
         // ── GUARD 4: Duplicate-ish source names (e.g. both
         //    "Ismail Hossain" and "Ismail Hussain" exist) ───
-        const srcNorms = (ledgerState.sources || []).map(s => norm(s));
         const seen = new Set();
         (ledgerState.sources || []).forEach(src => {
-            const n = norm(src);
+            const n = normName(src);
             if (seen.has(n)) {
                 issues.push(
                     `🟡 Source তালিকায় <strong>"${src}"</strong> নাম দুবার আছে (duplicate)।` +
@@ -2996,6 +3038,12 @@
                     ⚠️ Sync Guard সতর্কবার্তা — ${issues.length}টি সমস্যা পাওয়া গেছে
                 </div>
                 ${issues.map(i => `<div class="sg-issue">${i}</div>`).join('')}
+                ${hasAutoFixable ? `
+                <div style="margin-top:12px;">
+                    <button onclick="autoFixMismatchedEntries()" style="padding:8px 18px; background:#ef4444; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-size:0.85rem; display:inline-flex; align-items:center; gap:6px;">
+                        🔧 Auto-Fix করুন — ভুল নামগুলো স্বয়ংক্রিয়ভাবে ঠিক হবে
+                    </button>
+                </div>` : ''}
                 <div class="sg-hint">
                     💡 উপরের সমস্যাগুলো ঠিক না করলে Shareholder card-এ ভুল টাকা দেখাবে এবং Ledger export ভুল হবে।
                 </div>
@@ -3023,16 +3071,18 @@
         const transferTo = document.getElementById('entry-transfer-to');
         const filterAccount = document.getElementById('filter-account');
 
-        // Populate Source Select with existing sources + shareholders
+        // Populate Source Select:
+        // — SHAREHOLDERS always from the array (canonical names, no DB typos)
+        // — Non-shareholder sources from DB (e.g. "Other Income")
         sourceSelect.innerHTML = '';
-        const combinedSources = [...ledgerState.sources];
+        const shNormSet = new Set(SHAREHOLDERS.map(sh => normName(sh.name)));
         SHAREHOLDERS.forEach(sh => {
-            if (!combinedSources.some(s => s.toLowerCase() === sh.name.toLowerCase())) {
-                combinedSources.push(sh.name);
-            }
+            sourceSelect.innerHTML += `<option value="${sh.name}">${sh.name} (শেয়ারহোল্ডার)</option>`;
         });
-        combinedSources.forEach(src => {
-            sourceSelect.innerHTML += `<option value="${src}">${src}</option>`;
+        (ledgerState.sources || []).forEach(src => {
+            if (!shNormSet.has(normName(src))) {
+                sourceSelect.innerHTML += `<option value="${src}">${src}</option>`;
+            }
         });
 
         // Populate Sector Select

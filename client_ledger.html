@@ -1907,21 +1907,46 @@
         const totalsByName = {};
         let totalDeposited = 0;
 
+        // Helper: normalize a name for fuzzy matching (collapse spaces, lowercase)
+        function normalizeName(n) {
+            return (n || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        }
+
+        // Build a quick lookup: normalizedShareholderName -> canonical shareholder name
+        const shNormMap = {};
+        SHAREHOLDERS.forEach(sh => {
+            shNormMap[normalizeName(sh.name)] = sh.name;
+        });
+
+        // Track unmatched income entries (category doesn't map to any shareholder)
+        const unmatchedEntries = {};
+
         (ledgerState.entries || []).forEach(e => {
             if (e.type === 'income') {
                 const amt = Number(e.amount) || 0;
                 totalDeposited += amt;
-                const cat = (e.category || '').trim().toLowerCase();
-                totalsByName[cat] = (totalsByName[cat] || 0) + amt;
+                const catNorm = normalizeName(e.category);
+                // Try exact normalized match first
+                if (shNormMap[catNorm]) {
+                    const canonicalKey = normalizeName(shNormMap[catNorm]);
+                    totalsByName[canonicalKey] = (totalsByName[canonicalKey] || 0) + amt;
+                } else {
+                    // Unmatched — track for warning
+                    const displayCat = (e.category || 'Unknown').trim();
+                    unmatchedEntries[displayCat] = (unmatchedEntries[displayCat] || 0) + amt;
+                }
             }
         });
+
+        const unmatchedKeys = Object.keys(unmatchedEntries);
+        const unmatchedTotal = unmatchedKeys.reduce((s, k) => s + unmatchedEntries[k], 0);
 
         // 1. Render in UI card
         const grid = document.getElementById('shareholder-list-grid');
         if (grid) {
             grid.innerHTML = '';
             SHAREHOLDERS.forEach(sh => {
-                const key = sh.name.trim().toLowerCase();
+                const key = normalizeName(sh.name);
                 const deposited = totalsByName[key] || 0;
                 grid.innerHTML += `
                     <div class="shareholder-item" onclick="filterByIndividual('${sh.name}')" title="Click to filter transactions for ${sh.name}">
@@ -1940,6 +1965,26 @@
                     </div>
                 `;
             });
+
+            // Show unmatched warning box if any income entries don't match any shareholder
+            if (unmatchedKeys.length > 0) {
+                const unmatchedList = unmatchedKeys.map(k =>
+                    `<li style="margin:2px 0;"><strong>"${k}"</strong> — <span style="color:var(--accent-danger);">+${unmatchedEntries[k].toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ৳</span></li>`
+                ).join('');
+                grid.innerHTML += `
+                    <div style="grid-column: 1 / -1; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.5); border-radius: 10px; padding: 10px 14px; margin-top: 4px;">
+                        <div style="font-weight: 700; color: var(--accent-danger); font-size: 0.85rem; margin-bottom: 6px;">
+                            ⚠️ নাম মিলছে না — Unmatched Income Entries (${unmatchedKeys.length} name${unmatchedKeys.length > 1 ? 's' : ''}, মোট: +${unmatchedTotal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ৳)
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px;">
+                            নিচের নামগুলো কোনো Shareholder-এর সাথে মেলেনি। Entry Edit করে নাম ঠিক করুন:
+                        </div>
+                        <ul style="margin: 0; padding-left: 18px; color: var(--text-main); font-size: 0.82rem;">
+                            ${unmatchedList}
+                        </ul>
+                    </div>
+                `;
+            }
         }
 
         // 2. Render in Printable Shareholders Table (at top of both ledgers)
@@ -1947,7 +1992,7 @@
         if (printTbody) {
             printTbody.innerHTML = '';
             SHAREHOLDERS.forEach(sh => {
-                const key = sh.name.trim().toLowerCase();
+                const key = normalizeName(sh.name);
                 const deposited = totalsByName[key] || 0;
                 printTbody.innerHTML += `
                     <tr>
@@ -1971,6 +2016,16 @@
                     </td>
                 </tr>
             `;
+            // Unmatched warning in print table
+            if (unmatchedKeys.length > 0) {
+                printTbody.innerHTML += `
+                    <tr style="background: #fff3f3;">
+                        <td colspan="4" style="color: #dc2626; font-size: 8.5pt; padding: 6px 10px;">
+                            ⚠️ Unmatched names (not linked to any shareholder): ${unmatchedKeys.map(k => `"${k}" (+${unmatchedEntries[k].toFixed(2)} ৳)`).join(', ')}
+                        </td>
+                    </tr>
+                `;
+            }
         }
     }
 

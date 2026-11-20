@@ -1018,60 +1018,34 @@
             to { transform: rotate(360deg); }
         }
 
-        /* Print Styles */
+        /* Dedicated Print Styles - Matches Classic Debit/Credit/Balance Ledger */
+        #print-document-container {
+            display: none;
+        }
+
         @media print {
             body {
                 background: white !important;
-                color: #0a0e27 !important;
-                font-family: 'Inter', sans-serif;
-                font-size: 11pt;
+                color: #0f172a !important;
+                font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+                font-size: 8.5pt !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
-            #bg-canvas, header, .stats-grid, .sidebar-column, .ledger-controls, .ledger-actions, .btn-danger, .btn-primary, .btn-edit, .toast, #db-config-screen, #auth-screen, .panel-title i, .charts-grid, .charts-row, #edit-modal, .view-mode-toggle-bar, #individual-summary-banner, .shareholder-card {
+            @page {
+                size: A4 portrait;
+                margin: 8mm 6mm;
+            }
+            /* Hide ALL UI elements during print */
+            #bg-canvas, header, .stats-grid, .sidebar-column, .ledger-controls, 
+            .ledger-actions, .btn-danger, .btn-primary, .btn-edit, .btn, .toast, 
+            #db-config-screen, #auth-screen, .panel-title i, .charts-grid, 
+            .charts-row, #edit-modal, .view-mode-toggle-bar, 
+            #individual-summary-banner, .shareholder-card, .table-responsive,
+            .print-shareholders-section, .print-report-header, .panel {
                 display: none !important;
-            }
-            .print-shareholders-section {
-                display: block !important;
-                margin-bottom: 20px !important;
-            }
-            .print-shareholders-table {
-                width: 100% !important;
-                border-collapse: collapse !important;
-                margin-top: 8px !important;
-                margin-bottom: 18px !important;
-            }
-            .print-shareholders-table th, .print-shareholders-table td {
-                border: 1px solid #cbd5e1 !important;
-                padding: 6px 10px !important;
-                color: #0a0e27 !important;
-                font-size: 9pt !important;
-                background: transparent !important;
-            }
-            .print-shareholders-table th {
-                background-color: #f1f5f9 !important;
-                font-weight: bold !important;
-            }
-            .grouped-section-header td {
-                background: #f1f5f9 !important;
-                border-top: 2px solid #6366f1 !important;
-                color: #0a0e27 !important;
-                font-weight: bold !important;
-            }
-            .grouped-expense-header td {
-                background: #fef2f2 !important;
-                border-top: 2px solid #ef4444 !important;
-                color: #0a0e27 !important;
-                font-weight: bold !important;
-            }
-            .grouped-transfer-header td {
-                background: #f5f3ff !important;
-                border-top: 2px solid #8b5cf6 !important;
-                color: #0a0e27 !important;
-                font-weight: bold !important;
-            }
-            .grouped-subtotal-row td {
-                background: #f8fafc !important;
-                border-bottom: 1px dashed #cbd5e1 !important;
-                font-weight: bold !important;
             }
             .container {
                 max-width: 100% !important;
@@ -1082,100 +1056,171 @@
             .dashboard-content {
                 display: block !important;
             }
-            .panel {
-                background: white !important;
-                border: none !important;
-                box-shadow: none !important;
-                padding: 0 !important;
+
+            /* Dedicated Print Container is ONLY shown during print */
+            #print-document-container {
+                display: block !important;
+                width: 100% !important;
                 margin: 0 !important;
-                color: #0a0e27 !important;
+                padding: 0 !important;
+                background: white !important;
             }
-            .panel-title {
-                display: none !important;
+
+            .print-doc-header {
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: flex-start !important;
+                border-bottom: 2px solid #0284c7 !important;
+                padding-bottom: 8px !important;
+                margin-bottom: 10px !important;
             }
-            .table-responsive {
-                overflow: visible !important;
+            .print-doc-title {
+                font-size: 16pt !important;
+                font-weight: 800 !important;
+                color: #0c2461 !important;
+                line-height: 1.2 !important;
             }
-            .ledger-table {
+            .print-doc-subtitle {
+                font-size: 9pt !important;
+                color: #475569 !important;
+                margin-top: 3px !important;
+                font-weight: 600 !important;
+            }
+            .print-doc-meta {
+                text-align: right !important;
+                font-size: 8pt !important;
+                color: #64748b !important;
+                line-height: 1.4 !important;
+            }
+            .print-doc-sh-wrap {
+                margin-bottom: 10px !important;
+                border: 1px solid #cbd5e1 !important;
+                border-radius: 4px !important;
+                padding: 6px 8px !important;
+                background: #f8fafc !important;
+            }
+            .print-doc-sh-title {
+                font-size: 8pt !important;
+                font-weight: 700 !important;
+                color: #0c2461 !important;
+                text-transform: uppercase !important;
+                margin-bottom: 4px !important;
+                letter-spacing: 0.5px !important;
+            }
+            .print-doc-sh-table {
                 width: 100% !important;
                 border-collapse: collapse !important;
-                color: #0a0e27 !important;
-                margin-top: 10px;
+                font-size: 8pt !important;
             }
-            .ledger-table th, .ledger-table td {
-                border: 1px solid #ddd !important;
-                color: #0a0e27 !important;
-                padding: 10px 8px !important;
+            .print-doc-sh-table th, .print-doc-sh-table td {
+                padding: 3px 6px !important;
+                border: 1px solid #e2e8f0 !important;
+            }
+            .print-doc-sh-table th {
+                background: #e2e8f0 !important;
+                color: #1e293b !important;
+                font-weight: 700 !important;
+            }
+
+            /* Main Ledger Table matching classic layout */
+            .print-doc-table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                font-size: 8.5pt !important;
+                margin-top: 4px !important;
+            }
+            .print-doc-table th {
+                background-color: #e6eff5 !important;
+                color: #1e293b !important;
+                font-weight: 700 !important;
+                border: 1px solid #cbd5e1 !important;
+                padding: 6px 8px !important;
+                font-size: 8.5pt !important;
+                text-align: left !important;
+                vertical-align: middle !important;
+            }
+            .print-doc-table td {
+                border: 1px solid #e2e8f0 !important;
+                padding: 5px 8px !important;
+                color: #1e293b !important;
+                font-size: 8.5pt !important;
+                vertical-align: middle !important;
                 background: transparent !important;
-                font-size: 10pt;
             }
-            .ledger-table th {
-                background-color: #f8fafc !important;
-                font-weight: bold !important;
-                text-transform: uppercase;
-                font-size: 9pt;
-                letter-spacing: 0.5px;
+            .print-doc-table tbody tr:nth-child(even) td {
+                background-color: #fbfcfe !important;
             }
-            .ledger-table tbody tr:nth-child(even) {
-                background-color: #fcfdfe !important;
+            .print-doc-table tr {
+                page-break-inside: avoid !important;
             }
-            .ledger-table td.amount-col.income {
-                color: #10b981 !important;
+
+            .print-debit-val {
+                color: #dc2626 !important;
+                font-weight: 600 !important;
+                text-align: right !important;
+                white-space: nowrap !important;
             }
-            .ledger-table td.amount-col.expense {
-                color: #ef4444 !important;
+            .print-credit-val {
+                color: #16a34a !important;
+                font-weight: 600 !important;
+                text-align: right !important;
+                white-space: nowrap !important;
             }
-            .print-income {
-                color: #10b981 !important;
+            .print-bal-cell {
+                text-align: right !important;
+                white-space: nowrap !important;
+                line-height: 1.2 !important;
             }
-            .print-expense {
-                color: #ef4444 !important;
+            .print-bal-adv {
+                color: #16a34a !important;
+                font-weight: 700 !important;
+                font-size: 7.5pt !important;
             }
-            .print-net-success {
-                color: #10b981 !important;
+            .print-bal-due {
+                color: #dc2626 !important;
+                font-weight: 700 !important;
+                font-size: 7.5pt !important;
             }
-            .print-net-danger {
-                color: #ef4444 !important;
+            .print-bal-num {
+                font-weight: 700 !important;
+                font-size: 8.5pt !important;
             }
-            .ledger-table th:last-child, .ledger-table td:last-child {
-                display: none !important;
+            .print-bal-num.adv {
+                color: #16a34a !important;
             }
-            .ledger-table tfoot tr {
-                background: #f8fafc !important;
+            .print-bal-num.due {
+                color: #dc2626 !important;
+            }
+
+            .print-doc-table tfoot tr td {
+                background: #f1f5f9 !important;
                 border-top: 2px solid #334155 !important;
+                font-weight: 700 !important;
+                padding: 6px 8px !important;
+                font-size: 9pt !important;
             }
-            .ledger-table tfoot td {
-                font-weight: bold !important;
-                color: #0a0e27 !important;
-                font-size: 10pt !important;
+
+            .print-group-header td {
+                background: #edf2f7 !important;
+                font-weight: 700 !important;
+                color: #0c2461 !important;
+                border-top: 1.5px solid #0284c7 !important;
+                padding: 6px 8px !important;
             }
-            .print-report-header {
+            .print-group-subtotal td {
+                background: #f8fafc !important;
+                font-weight: 700 !important;
+                border-bottom: 1.5px dashed #cbd5e1 !important;
+            }
+
+            .print-doc-footer {
+                margin-top: 12px !important;
+                border-top: 1px solid #cbd5e1 !important;
+                padding-top: 6px !important;
                 display: flex !important;
-                justify-content: space-between;
-                align-items: center;
-                border-bottom: 2px solid #00d9ff;
-                padding-bottom: 15px;
-                margin-bottom: 25px;
-                font-family: 'Outfit', sans-serif;
-            }
-            .print-logo-ring {
-                display: block !important;
-            }
-            .print-title-area h2 {
-                font-size: 24px;
-                margin: 0;
-                color: #0a0e27;
-            }
-            .print-title-area p {
-                font-size: 13px;
-                margin: 5px 0 0 0;
-                color: #555;
-            }
-            .print-meta-area {
-                text-align: right;
-                font-size: 11px;
-                color: #555;
-                line-height: 1.5;
+                justify-content: space-between !important;
+                font-size: 7.5pt !important;
+                color: #94a3b8 !important;
             }
         }
     </style>
@@ -1186,6 +1231,9 @@
 <canvas id="bg-canvas"></canvas>
 
 <div class="container">
+    <!-- Dedicated Print Document Container (Classic Debit/Credit/Balance Ledger) -->
+    <div id="print-document-container" class="print-document-container"></div>
+
     <!-- Printable Report Header -->
     <div class="print-report-header" style="display: none;">
         <div class="print-logo-ring">
@@ -3218,69 +3266,415 @@
         showToast('Grouped Ledger CSV downloaded successfully!');
     }
 
-    // Print Standard Ledger
-    function printLedger() {
-        const dateElements = document.querySelectorAll('.print-date-val');
-        const userElements = document.querySelectorAll('.print-user-val');
-        
-        const nowStr = new Date().toLocaleString('en-US', { 
-            dateStyle: 'medium', 
-            timeStyle: 'short' 
+    // ==========================================
+    // CLASSIC DEBIT / CREDIT / BALANCE PRINT SYSTEM
+    // Matches standard accounting layout (Screenshot 2)
+    // ==========================================
+    function buildPrintDocument(mode = 'standard') {
+        const container = document.getElementById('print-document-container');
+        if (!container) return;
+
+        // Gather current filter selections
+        const filterType = document.getElementById('filter-type') ? document.getElementById('filter-type').value : 'all';
+        const filterPerson = document.getElementById('filter-person') ? document.getElementById('filter-person').value : 'all';
+        const filterAcc = document.getElementById('filter-account') ? document.getElementById('filter-account').value : 'all';
+        const filterSearch = document.getElementById('filter-search') ? document.getElementById('filter-search').value.toLowerCase().trim() : '';
+
+        // Filter transactions
+        const filteredEntries = ledgerState.entries.filter(entry => {
+            const matchesType = filterType === 'all' || entry.type === filterType;
+            const matchesAcc = filterAcc === 'all' || entry.account === filterAcc || entry.transfer_account === filterAcc;
+            let matchesPerson = true;
+            if (filterPerson !== 'all') {
+                const target = filterPerson.toLowerCase();
+                matchesPerson = (entry.category && entry.category.toLowerCase() === target) ||
+                                (entry.notes && entry.notes.toLowerCase().includes(target));
+            }
+            const matchesSearch = !filterSearch ||
+                (entry.category && entry.category.toLowerCase().includes(filterSearch)) ||
+                (entry.notes && entry.notes.toLowerCase().includes(filterSearch)) ||
+                (entry.account && entry.account.toLowerCase().includes(filterSearch)) ||
+                (entry.transfer_account && entry.transfer_account.toLowerCase().includes(filterSearch));
+            return matchesType && matchesAcc && matchesPerson && matchesSearch;
         });
-        
+
+        // User and timestamp
+        const now = new Date();
+        const nowStr = now.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
         let userEmail = 'Local Ledger User';
         const emailEl = document.getElementById('header-user-email');
         if (emailEl && emailEl.textContent && emailEl.textContent !== 'email@domain.com') {
             userEmail = emailEl.textContent;
         }
-        
-        dateElements.forEach(el => el.textContent = nowStr);
-        userElements.forEach(el => el.textContent = userEmail);
 
-        const filterPerson = document.getElementById('filter-person') ? document.getElementById('filter-person').value : 'all';
-        const printSubTitle = document.querySelector('.print-title-area p');
-        if (printSubTitle) {
-            if (filterPerson !== 'all') {
-                printSubTitle.textContent = `Individual Statement: ${filterPerson}`;
-            } else if (currentLedgerView === 'grouped') {
-                printSubTitle.textContent = 'Grouped Ledger Statement (Individual Deposits & Expenses)';
-            } else {
-                printSubTitle.textContent = 'Ledger Account Management Report';
+        // Subtitle logic
+        let subTitle = 'Ledger Account Statement';
+        if (filterPerson !== 'all') {
+            subTitle = `Individual Statement: ${filterPerson}`;
+        } else if (mode === 'grouped') {
+            subTitle = 'Grouped Ledger Statement (Individual Deposits & Expenses)';
+        } else if (filterType === 'income') {
+            subTitle = 'Investments & Deposits Statement';
+        } else if (filterType === 'expense') {
+            subTitle = 'Expenses Statement';
+        }
+
+        // Shareholders summary card (top)
+        let shTableHTML = '';
+        if (filterPerson === 'all' && typeof SHAREHOLDERS !== 'undefined' && SHAREHOLDERS.length > 0) {
+            const totalsByName = {};
+            ledgerState.entries.forEach(e => {
+                if (e.type === 'income' && e.category) {
+                    const k = normName(e.category);
+                    totalsByName[k] = (totalsByName[k] || 0) + Number(e.amount);
+                }
+            });
+            let shRows = '';
+            let sumShares = 0;
+            let sumPct = 0;
+            let sumDep = 0;
+            SHAREHOLDERS.forEach(sh => {
+                const k = normName(sh.name);
+                const dep = totalsByName[k] || 0;
+                sumShares += sh.shares;
+                sumPct += sh.percentage;
+                sumDep += dep;
+                shRows += `
+                    <tr>
+                        <td style="font-weight: 600;">${sh.name}</td>
+                        <td style="text-align: center;">${sh.shares}</td>
+                        <td style="text-align: center;">${sh.percentage}%</td>
+                        <td style="text-align: right; color: #16a34a; font-weight: 600;">+${dep.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ৳</td>
+                    </tr>
+                `;
+            });
+            shTableHTML = `
+                <div class="print-doc-sh-wrap">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span class="print-doc-sh-title">Shareholders &amp; Ownership Distribution</span>
+                        <span style="font-size: 7.5pt; color: #64748b; font-weight: 600;">Total Shares: ${sumShares} (100%)</span>
+                    </div>
+                    <table class="print-doc-sh-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left;">Shareholder Name</th>
+                                <th style="text-align: center; width: 60px;">Shares</th>
+                                <th style="text-align: center; width: 80px;">Ownership</th>
+                                <th style="text-align: right; width: 130px;">Total Deposited</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${shRows}
+                            <tr style="background: #f1f5f9; font-weight: 700; border-top: 1.5px solid #cbd5e1;">
+                                <td>Total Shares</td>
+                                <td style="text-align: center;">${sumShares}</td>
+                                <td style="text-align: center;">${sumPct}%</td>
+                                <td style="text-align: right; color: #16a34a;">+${sumDep.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ৳</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } else if (filterPerson !== 'all') {
+            const shInfo = (typeof SHAREHOLDERS !== 'undefined') ? SHAREHOLDERS.find(s => s.name.toLowerCase() === filterPerson.toLowerCase()) : null;
+            if (shInfo) {
+                shTableHTML = `
+                    <div style="margin-bottom: 10px; padding: 6px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; font-size: 8.5pt; display: flex; justify-content: space-between; align-items: center;">
+                        <span><strong>Shareholder:</strong> ${shInfo.name}</span>
+                        <span style="color: #16a34a; font-weight: 700;">Shares: ${shInfo.shares} (${shInfo.percentage}% Ownership)</span>
+                    </div>
+                `;
             }
         }
-        
-        window.print();
+
+        let rowsHTML = '';
+        let totalDebit = 0;
+        let totalCredit = 0;
+
+        if (mode === 'standard') {
+            let runningBalance = 0;
+            filteredEntries.forEach((entry) => {
+                const isExpense = entry.type === 'expense';
+                const isIncome = entry.type === 'income';
+                const isTransfer = entry.type === 'transfer';
+
+                const debit = isExpense ? Number(entry.amount) : (isTransfer ? Number(entry.amount) : 0);
+                const credit = isIncome ? Number(entry.amount) : 0;
+                runningBalance += (credit - debit);
+                totalDebit += debit;
+                totalCredit += credit;
+
+                const isAdv = runningBalance >= 0;
+                const balSign = isAdv ? 'Adv' : 'Due';
+                const balClass = isAdv ? 'adv' : 'due';
+                const balVal = Math.abs(runningBalance).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+                const payType = (isTransfer ? `${entry.account} → ${entry.transfer_account}` : (entry.account || '')).toUpperCase();
+                const debitDisplay = debit > 0
+                    ? `<td class="print-debit-val">${debit.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>`
+                    : `<td></td>`;
+                const creditDisplay = credit > 0
+                    ? `<td class="print-credit-val">${credit.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>`
+                    : `<td></td>`;
+
+                rowsHTML += `
+                    <tr>
+                        <td style="white-space: nowrap; text-align: center; color: #475569;">${entry.date || ''}</td>
+                        <td style="font-weight: 600; color: #0f172a;">${entry.category || 'N/A'}</td>
+                        <td style="color: #334155; font-weight: 600; font-size: 8pt;">${payType}</td>
+                        ${debitDisplay}
+                        ${creditDisplay}
+                        <td class="print-bal-cell">
+                            <div class="print-bal-${balClass}">${balSign}</div>
+                            <div class="print-bal-num ${balClass}">${balVal}</div>
+                        </td>
+                        <td style="color: #475569; font-size: 8pt;">${entry.notes || ''}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            // Grouped Mode: Deposits by Person, Expenses grouped, Transfers grouped
+            const incomes = filteredEntries.filter(e => e.type === 'income');
+            const expenses = filteredEntries.filter(e => e.type === 'expense');
+            const transfers = filteredEntries.filter(e => e.type === 'transfer');
+
+            if (incomes.length > 0) {
+                const personGroups = {};
+                incomes.forEach(entry => {
+                    const person = (entry.category || 'Other').trim();
+                    if (!personGroups[person]) personGroups[person] = [];
+                    personGroups[person].push(entry);
+                });
+
+                const allPersons = Object.keys(personGroups);
+                const sortedPersons = [];
+                if (typeof SHAREHOLDERS !== 'undefined') {
+                    SHAREHOLDERS.forEach(sh => {
+                        const match = allPersons.find(p => p.toLowerCase() === sh.name.toLowerCase());
+                        if (match && !sortedPersons.includes(match)) sortedPersons.push(match);
+                    });
+                }
+                allPersons.sort((a,b) => a.localeCompare(b)).forEach(p => {
+                    if (!sortedPersons.includes(p)) sortedPersons.push(p);
+                });
+
+                sortedPersons.forEach(person => {
+                    const entries = personGroups[person];
+                    const pSubtotal = entries.reduce((s, e) => s + Number(e.amount), 0);
+                    totalCredit += pSubtotal;
+
+                    const shInfo = (typeof SHAREHOLDERS !== 'undefined') ? SHAREHOLDERS.find(s => s.name.toLowerCase() === person.toLowerCase()) : null;
+                    const shBadge = shInfo ? ` (${shInfo.shares} Shares, ${shInfo.percentage}%)` : '';
+
+                    rowsHTML += `
+                        <tr class="print-group-header">
+                            <td colspan="7">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span><strong>${person}</strong>${shBadge}</span>
+                                    <span style="color: #16a34a; font-weight: 700;">Deposits Subtotal: +${pSubtotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ৳</span>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+
+                    entries.forEach(entry => {
+                        const payType = (entry.account || '').toUpperCase();
+                        rowsHTML += `
+                            <tr>
+                                <td style="white-space: nowrap; text-align: center; color: #475569;">${entry.date || ''}</td>
+                                <td style="color: #0f172a; font-weight: 600;">${entry.category || person}</td>
+                                <td style="color: #334155; font-weight: 600; font-size: 8pt;">${payType}</td>
+                                <td></td>
+                                <td class="print-credit-val">${Number(entry.amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
+                                <td class="print-bal-cell">
+                                    <div class="print-bal-adv">Adv</div>
+                                    <div class="print-bal-num adv">${Number(entry.amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</div>
+                                </td>
+                                <td style="color: #475569; font-size: 8pt;">${entry.notes || ''}</td>
+                            </tr>
+                        `;
+                    });
+
+                    rowsHTML += `
+                        <tr class="print-group-subtotal">
+                            <td colspan="3" style="text-align: right; color: #475569;">Subtotal for ${person}:</td>
+                            <td></td>
+                            <td class="print-credit-val" style="font-weight: 700;">+${pSubtotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
+                            <td class="print-bal-cell">
+                                <div class="print-bal-adv">Adv</div>
+                                <div class="print-bal-num adv">${pSubtotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</div>
+                            </td>
+                            <td style="color: #64748b; font-size: 7.5pt; font-style: italic;">(${entries.length} deposit${entries.length === 1 ? '' : 's'})</td>
+                        </tr>
+                    `;
+                });
+
+                if (sortedPersons.length > 1) {
+                    rowsHTML += `
+                        <tr style="background: #f0fdf4; border-top: 1.5px solid #16a34a; font-weight: 700;">
+                            <td colspan="3" style="text-align: right; font-size: 9pt;">TOTAL ALL DEPOSITS:</td>
+                            <td></td>
+                            <td class="print-credit-val" style="font-size: 9.5pt;">+${totalCredit.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
+                            <td class="print-bal-cell">
+                                <div class="print-bal-adv">Adv</div>
+                                <div class="print-bal-num adv">${totalCredit.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</div>
+                            </td>
+                            <td style="color: #475569; font-size: 7.5pt;">(${incomes.length} total deposits)</td>
+                        </tr>
+                    `;
+                }
+            }
+
+            if (expenses.length > 0) {
+                const expTotal = expenses.reduce((s, e) => s + Number(e.amount), 0);
+                totalDebit += expTotal;
+
+                rowsHTML += `
+                    <tr class="print-group-header" style="border-top: 2px solid #ef4444; background: #fef2f2;">
+                        <td colspan="7">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #991b1b;"><strong>Expenses</strong> (All Sectors)</span>
+                                <span style="color: #dc2626; font-weight: 700;">Total Expenses: -${expTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ৳</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+
+                expenses.forEach(entry => {
+                    const payType = (entry.account || '').toUpperCase();
+                    rowsHTML += `
+                        <tr>
+                            <td style="white-space: nowrap; text-align: center; color: #475569;">${entry.date || ''}</td>
+                            <td style="color: #0f172a; font-weight: 600;">${entry.category || 'Expense'}</td>
+                            <td style="color: #334155; font-weight: 600; font-size: 8pt;">${payType}</td>
+                            <td class="print-debit-val">${Number(entry.amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
+                            <td></td>
+                            <td class="print-bal-cell">
+                                <div class="print-bal-due">Due</div>
+                                <div class="print-bal-num due">${Number(entry.amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</div>
+                            </td>
+                            <td style="color: #475569; font-size: 8pt;">${entry.notes || ''}</td>
+                        </tr>
+                    `;
+                });
+
+                rowsHTML += `
+                    <tr class="print-group-subtotal" style="background: #fef2f2;">
+                        <td colspan="3" style="text-align: right; color: #991b1b; font-weight: 700;">TOTAL EXPENSES:</td>
+                        <td class="print-debit-val" style="font-weight: 700;">-${expTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
+                        <td></td>
+                        <td></td>
+                        <td style="color: #64748b; font-size: 7.5pt; font-style: italic;">(${expenses.length} expense${expenses.length === 1 ? '' : 's'})</td>
+                    </tr>
+                `;
+            }
+
+            if (transfers.length > 0) {
+                const transTotal = transfers.reduce((s, e) => s + Number(e.amount), 0);
+                rowsHTML += `
+                    <tr class="print-group-header" style="border-top: 1.5px solid #8b5cf6; background: #f5f3ff;">
+                        <td colspan="7">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #5b21b6;"><strong>Account Transfers</strong></span>
+                                <span style="color: #7c3aed; font-weight: 700;">Total Transfers: ${transTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ৳</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                transfers.forEach(entry => {
+                    const transferRoute = `${entry.account} → ${entry.transfer_account}`.toUpperCase();
+                    rowsHTML += `
+                        <tr>
+                            <td style="white-space: nowrap; text-align: center; color: #475569;">${entry.date || ''}</td>
+                            <td style="color: #0f172a; font-weight: 600;">Transfer</td>
+                            <td style="color: #334155; font-weight: 600; font-size: 8pt;">${transferRoute}</td>
+                            <td class="print-debit-val">${Number(entry.amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
+                            <td></td>
+                            <td></td>
+                            <td style="color: #475569; font-size: 8pt;">${entry.notes || ''}</td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+
+        const netAmount = totalCredit - totalDebit;
+        const isNetAdv = netAmount >= 0;
+        const netSign = isNetAdv ? 'Adv' : 'Due';
+        const netClass = isNetAdv ? 'adv' : 'due';
+        const netFormatted = Math.abs(netAmount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+        container.innerHTML = `
+            <div class="print-doc-header">
+                <div>
+                    <div class="print-doc-title">Cha-Joy Bonosree A Block</div>
+                    <div class="print-doc-subtitle">${subTitle}</div>
+                </div>
+                <div class="print-doc-meta">
+                    <div><strong>Generated:</strong> ${nowStr}</div>
+                    <div><strong>User:</strong> ${userEmail}</div>
+                    <div><strong>Total Records:</strong> ${filteredEntries.length}</div>
+                </div>
+            </div>
+
+            ${shTableHTML}
+
+            <table class="print-doc-table">
+                <thead>
+                    <tr>
+                        <th style="width: 75px; text-align: center;">Date</th>
+                        <th>Particulars / Source</th>
+                        <th style="width: 140px;">Pay Type</th>
+                        <th style="width: 90px; text-align: right;">Debit (৳)</th>
+                        <th style="width: 90px; text-align: right;">Credit (৳)</th>
+                        <th style="width: 95px; text-align: right;">Balance (৳)</th>
+                        <th style="width: 160px;">Note</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHTML || '<tr><td colspan="7" style="text-align: center; padding: 18px; color: #94a3b8;">No matching transactions found</td></tr>'}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3" style="text-align: right; font-weight: 700; font-size: 9pt;">TOTAL:</td>
+                        <td class="print-debit-val" style="font-size: 9pt;">${totalDebit > 0 ? totalDebit.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ৳' : '-'}</td>
+                        <td class="print-credit-val" style="font-size: 9pt;">${totalCredit > 0 ? totalCredit.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ৳' : '-'}</td>
+                        <td class="print-bal-cell" style="font-size: 9pt;">
+                            <div class="print-bal-${netClass}">${netSign}</div>
+                            <div class="print-bal-num ${netClass}">${netFormatted} ৳</div>
+                        </td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div class="print-doc-footer">
+                <span>Cha-Joy Bonosree A Block &bull; Confidential Business Ledger</span>
+                <span>Printed: ${nowStr}</span>
+            </div>
+        `;
+    }
+
+    // Print Standard Ledger
+    function printLedger() {
+        buildPrintDocument('standard');
+        setTimeout(() => {
+            window.print();
+        }, 100);
     }
 
     // Print Grouped Ledger
     function printGroupedLedger() {
-        const prevView = currentLedgerView;
-        currentLedgerView = 'grouped';
-        setLedgerView('grouped');
-
-        const dateElements = document.querySelectorAll('.print-date-val');
-        const userElements = document.querySelectorAll('.print-user-val');
-        const nowStr = new Date().toLocaleString('en-US', { 
-            dateStyle: 'medium', 
-            timeStyle: 'short' 
-        });
-        let userEmail = 'Local Ledger User';
-        const emailEl = document.getElementById('header-user-email');
-        if (emailEl && emailEl.textContent && emailEl.textContent !== 'email@domain.com') {
-            userEmail = emailEl.textContent;
-        }
-        dateElements.forEach(el => el.textContent = nowStr);
-        userElements.forEach(el => el.textContent = userEmail);
-
-        const printSubTitle = document.querySelector('.print-title-area p');
-        if (printSubTitle) {
-            printSubTitle.textContent = 'Grouped Ledger Statement (Individual Deposits & Expenses)';
-        }
-
+        buildPrintDocument('grouped');
         setTimeout(() => {
             window.print();
-        }, 150);
+        }, 100);
     }
+
+    // Browser Ctrl+P listener
+    window.addEventListener('beforeprint', () => {
+        buildPrintDocument(currentLedgerView === 'grouped' ? 'grouped' : 'standard');
+    });
 
     // Render Settings lists
     function renderSettingsLists() {

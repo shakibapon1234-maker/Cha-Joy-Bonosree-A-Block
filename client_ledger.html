@@ -1779,6 +1779,29 @@
         return bestScore > 0 ? bestName : null;
     }
 
+    function canonicalizeShareholderName(name) {
+        const normalized = normName(name).replace(/[^a-z0-9\s]/g, '').trim();
+        if (/^ismail\s+(hossein|hossain|hussain|husain|hosain)$/.test(normalized)) {
+            return 'Ismail Hossain';
+        }
+        const exact = SHAREHOLDERS.find(sh => normName(sh.name) === normalized);
+        return exact ? exact.name : (name || '').trim();
+    }
+
+    function normalizeCanonicalShareholderNames() {
+        (ledgerState.entries || []).forEach(entry => {
+            if (entry.type === 'income') {
+                entry.category = canonicalizeShareholderName(entry.category);
+            }
+        });
+        ledgerState.sources = (ledgerState.sources || [])
+            .map(source => canonicalizeShareholderName(source))
+            .filter((source, index, sources) =>
+                sources.findIndex(item => normName(item) === normName(source)) === index
+            );
+        saveState();
+    }
+
     // ── Auto-fix mismatched income entries (localStorage) ───
     function autoFixMismatchedEntries() {
         const shNormMap = {};
@@ -1842,6 +1865,8 @@
         
         // Retrieve or initialize entries
         ledgerState.entries = JSON.parse(localStorage.getItem(LS_KEYS.ENTRIES)) || [];
+
+        normalizeCanonicalShareholderNames();
 
         // Save back defaults if new
         saveState();
@@ -1935,7 +1960,7 @@
         
         let category = '';
         if (type === 'income') {
-            category = document.getElementById('entry-source').value;
+            category = canonicalizeShareholderName(document.getElementById('entry-source').value);
         } else if (type === 'expense') {
             category = document.getElementById('entry-sector').value;
         } else {
@@ -1980,7 +2005,7 @@
         
         if (configType === 'source') {
             const input = document.getElementById('new-source-input');
-            const val = input.value.trim();
+            const val = canonicalizeShareholderName(input.value.trim());
             if (val && !ledgerState.sources.includes(val)) {
                 ledgerState.sources.push(val);
                 saveState();
@@ -2322,7 +2347,7 @@
 
         let category = '';
         if (type === 'income') {
-            category = document.getElementById('edit-entry-source').value;
+            category = canonicalizeShareholderName(document.getElementById('edit-entry-source').value);
         } else if (type === 'expense') {
             category = document.getElementById('edit-entry-sector').value;
         } else {

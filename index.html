@@ -2369,6 +2369,8 @@
             ledgerState.categories = (categoriesRes.data || []).map(c => c.name);
             ledgerState.accounts = (accountsRes.data || []).map(a => a.name);
 
+            await normalizeCanonicalShareholderNames();
+
             // Populate defaults if it's a completely new user
             if (ledgerState.sources.length === 0 && ledgerState.categories.length === 0 && ledgerState.accounts.length === 0) {
                 showLoading(true, 'Writing default configurations...');
@@ -2448,7 +2450,7 @@
         
         let category = '';
         if (type === 'income') {
-            category = document.getElementById('entry-source').value;
+            category = canonicalizeShareholderName(document.getElementById('entry-source').value);
         } else if (type === 'expense') {
             category = document.getElementById('entry-sector').value;
         } else {
@@ -2505,7 +2507,7 @@
         
         if (configType === 'source') {
             const input = document.getElementById('new-source-input');
-            const name = input.value.trim();
+            const name = canonicalizeShareholderName(input.value.trim());
             if (!name) return;
             
             showLoading(true, 'Adding source...');
@@ -2743,9 +2745,19 @@
     // ── Global normalize helper ───────────────────────────
     function normName(n) { return (n || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
 
+    // Return the one canonical spelling for known shareholder-name variants.
+    function canonicalizeShareholderName(name) {
+        const normalized = normName(name).replace(/[^a-z0-9\s]/g, '').trim();
+        if (/^ismail\s+(hossein|hossain|hussain|husain|hosain)$/.test(normalized)) {
+            return 'Ismail Hossain';
+        }
+        const exact = SHAREHOLDERS.find(sh => normName(sh.name) === normalized);
+        return exact ? exact.name : (name || '').trim();
+    }
+
     // ── Find best-matching SHAREHOLDER for a given name ──
     function findBestShareholder(catName) {
-        const catNorm = normName(catName);
+        const catNorm = normName(canonicalizeShareholderName(catName));
         // exact match
         const exact = SHAREHOLDERS.find(sh => normName(sh.name) === catNorm);
         if (exact) return exact.name;
@@ -2758,6 +2770,52 @@
             if (score > bestScore) { bestScore = score; bestMatch = sh.name; }
         });
         return bestScore >= 1 ? bestMatch : null;
+    }
+
+    async function normalizeCanonicalShareholderNames() {
+        const entryUpdates = [];
+        (ledgerState.entries || []).forEach(entry => {
+            if (entry.type !== 'income') return;
+            const canonical = canonicalizeShareholderName(entry.category);
+            if (SHAREHOLDERS.some(sh => sh.name === canonical) &&
+                normName(entry.category) !== normName(canonical)) {
+                entryUpdates.push(entry);
+            }
+        });
+
+        for (const entry of entryUpdates) {
+            await supabaseClient.from('ledger_entries')
+                .update({ category: canonicalizeShareholderName(entry.category) })
+                .eq('id', entry.id);
+        }
+
+        const sourceNames = (ledgerState.sources || []).map(source => source);
+        for (const sourceName of sourceNames) {
+            const canonical = canonicalizeShareholderName(sourceName);
+            if (!SHAREHOLDERS.some(sh => sh.name === canonical) ||
+                normName(sourceName) === normName(canonical)) continue;
+
+            const canonicalExists = sourceNames.some(source =>
+                normName(source) === normName(canonical)
+            );
+            if (!canonicalExists) {
+                await supabaseClient.from('ledger_sources').insert([{ name: canonical }]);
+            }
+            await supabaseClient.from('ledger_sources').delete().eq('name', sourceName);
+        }
+
+        if (entryUpdates.length > 0) {
+            ledgerState.entries.forEach(entry => {
+                if (entry.type === 'income') {
+                    entry.category = canonicalizeShareholderName(entry.category);
+                }
+            });
+        }
+        ledgerState.sources = ledgerState.sources.map(source =>
+            canonicalizeShareholderName(source)
+        ).filter((source, index, sources) =>
+            sources.findIndex(item => normName(item) === normName(source)) === index
+        );
     }
 
     // ── Auto-fix mismatched income entries in Supabase ───
@@ -2945,7 +3003,7 @@
 
         let category = '';
         if (type === 'income') {
-            category = document.getElementById('edit-entry-source').value;
+            category = canonicalizeShareholderName(document.getElementById('edit-entry-source').value);
         } else if (type === 'expense') {
             category = document.getElementById('edit-entry-sector').value;
         } else {

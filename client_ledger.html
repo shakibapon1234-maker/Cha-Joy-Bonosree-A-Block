@@ -1528,6 +1528,17 @@
                                 </button>
                             </div>
                         </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Transaction Order:</span>
+                            <div style="display: inline-flex; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 8px; padding: 3px; gap: 4px;">
+                                <button type="button" id="toggle-order-newest" class="btn-view-toggle active" onclick="setTransactionOrder('latest-first')">
+                                    <i class="fa-solid fa-arrow-down-wide-short"></i> Latest on Top
+                                </button>
+                                <button type="button" id="toggle-order-oldest" class="btn-view-toggle" onclick="setTransactionOrder('latest-last')">
+                                    <i class="fa-solid fa-arrow-up-wide-short"></i> Latest on Bottom
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="ledger-actions" style="margin-top: 10px; margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
@@ -1825,6 +1836,7 @@
         renderAll();
     }
     let currentLedgerView = 'standard'; // 'standard' | 'grouped'
+    let transactionOrder = localStorage.getItem('ledger_transaction_order') || 'latest-first'; // 'latest-first' | 'latest-last'
 
     // Default Initial Data (now includes shareholders)
     const defaults = {
@@ -2206,6 +2218,27 @@
         renderLedgerTable();
     }
 
+    function setTransactionOrder(order) {
+        transactionOrder = order;
+        localStorage.setItem('ledger_transaction_order', order);
+        const newestBtn = document.getElementById('toggle-order-newest');
+        const oldestBtn = document.getElementById('toggle-order-oldest');
+        if (newestBtn && oldestBtn) {
+            newestBtn.classList.toggle('active', order === 'latest-first');
+            oldestBtn.classList.toggle('active', order === 'latest-last');
+        }
+        renderLedgerTable();
+        buildPrintDocument(currentLedgerView === 'grouped' ? 'grouped' : 'standard');
+    }
+
+    function syncTransactionOrderButtons() {
+        const newestBtn = document.getElementById('toggle-order-newest');
+        const oldestBtn = document.getElementById('toggle-order-oldest');
+        if (!newestBtn || !oldestBtn) return;
+        newestBtn.classList.toggle('active', transactionOrder === 'latest-first');
+        oldestBtn.classList.toggle('active', transactionOrder === 'latest-last');
+    }
+
     // Populate dropdowns inside Edit modal
     function populateEditDropdowns(entry) {
         const sourceSelect = document.getElementById('edit-entry-source');
@@ -2503,6 +2536,7 @@
     }
 
     function renderAll() {
+        syncTransactionOrderButtons();
         runSyncGuard();
         renderShareholders();
         renderFormDropdowns();
@@ -2746,6 +2780,11 @@
             
             return matchesType && matchesAcc && matchesPerson && matchesSearch;
         });
+        const chronologicalEntries = [...filteredEntries].sort((a, b) => {
+            const dateDiff = String(a.date || '').localeCompare(String(b.date || ''));
+            if (dateDiff !== 0) return dateDiff;
+            return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+        });
 
         // Update Individual Summary Banner
         const summaryBanner = document.getElementById('individual-summary-banner');
@@ -2839,7 +2878,15 @@
 
         if (currentLedgerView === 'standard') {
             // 1. STANDARD CHRONOLOGICAL VIEW
-            filteredEntries.forEach(entry => {
+            const chronologicalEntries = [...filteredEntries].sort((a, b) => {
+                const dateDiff = String(a.date || '').localeCompare(String(b.date || ''));
+                if (dateDiff !== 0) return dateDiff;
+                return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+            });
+            const websiteEntries = transactionOrder === 'latest-first'
+                ? chronologicalEntries.reverse()
+                : chronologicalEntries;
+            websiteEntries.forEach(entry => {
                 tbody.innerHTML += generateRowHTML(entry);
             });
         } else {
@@ -3103,7 +3150,13 @@
         csvContent += "Date,Type,Source/Sector,Account,Amount,Description\n";
 
         let totalAmount = 0;
-        indEntries.forEach(entry => {
+        const statementEntries = [...indEntries].sort((a, b) => {
+            const dateDiff = String(a.date || '').localeCompare(String(b.date || ''));
+            if (dateDiff !== 0) return dateDiff;
+            return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+        });
+        if (transactionOrder === 'latest-first') statementEntries.reverse();
+        statementEntries.forEach(entry => {
             const date = entry.date || '';
             const type = entry.type === 'income' ? 'Invest' : entry.type === 'expense' ? 'Expense' : 'Transfer';
             const sourceOrSector = (entry.category || '').replace(/"/g, '""');
@@ -3161,7 +3214,13 @@
         csvContent += "=== TRANSACTION RECORDS ===\n";
         csvContent += "Date,Type,Source/Sector,Account,Amount,Description\n";
         let runningNet = 0;
-        filteredEntries.forEach(entry => {
+        const exportEntries = [...filteredEntries].sort((a, b) => {
+            const dateDiff = String(a.date || '').localeCompare(String(b.date || ''));
+            if (dateDiff !== 0) return dateDiff;
+            return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+        });
+        if (transactionOrder === 'latest-first') exportEntries.reverse();
+        exportEntries.forEach(entry => {
             const date = entry.date || '';
             const type = entry.type === 'income' ? 'Invest' : entry.type === 'expense' ? 'Expense' : 'Transfer';
             const sourceOrSector = entry.category || '';
@@ -3322,6 +3381,11 @@
                 (entry.transfer_account && entry.transfer_account.toLowerCase().includes(filterSearch));
             return matchesType && matchesAcc && matchesPerson && matchesSearch;
         });
+        const chronologicalEntries = [...filteredEntries].sort((a, b) => {
+            const dateDiff = String(a.date || '').localeCompare(String(b.date || ''));
+            if (dateDiff !== 0) return dateDiff;
+            return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+        });
 
         // User and timestamp
         const now = new Date();
@@ -3418,12 +3482,13 @@
 
         if (mode === 'standard') {
             let runningBalance = 0;
-            filteredEntries.forEach((entry) => {
+            const balanceRows = [];
+            chronologicalEntries.forEach((entry) => {
                 const isExpense = entry.type === 'expense';
                 const isIncome = entry.type === 'income';
                 const isTransfer = entry.type === 'transfer';
 
-                const debit = isExpense ? Number(entry.amount) : (isTransfer ? Number(entry.amount) : 0);
+                const debit = isExpense ? Number(entry.amount) : 0;
                 const credit = isIncome ? Number(entry.amount) : 0;
                 runningBalance += (credit - debit);
                 totalDebit += debit;
@@ -3442,7 +3507,7 @@
                     ? `<td class="print-credit-val">${credit.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>`
                     : `<td></td>`;
 
-                rowsHTML += `
+                balanceRows.push(`
                     <tr>
                         <td style="white-space: nowrap; text-align: center; color: #475569;">${entry.date || ''}</td>
                         <td style="font-weight: 600; color: #0f172a;">${entry.category || 'N/A'}</td>
@@ -3455,8 +3520,12 @@
                         </td>
                         <td style="color: #475569; font-size: 8pt;">${entry.notes || ''}</td>
                     </tr>
-                `;
+                `);
             });
+            rowsHTML = (transactionOrder === 'latest-first'
+                ? balanceRows.reverse()
+                : balanceRows
+            ).join('');
         } else {
             // Grouped Mode: Deposits by Person, Expenses grouped, Transfers grouped
             const incomes = filteredEntries.filter(e => e.type === 'income');
@@ -3572,7 +3641,7 @@
                             <td style="white-space: nowrap; text-align: center; color: #475569;">${entry.date || ''}</td>
                             <td style="color: #0f172a; font-weight: 600;">${entry.category || 'Expense'}</td>
                             <td style="color: #334155; font-weight: 600; font-size: 8pt;">${payType}</td>
-                            <td class="print-debit-val">${Number(entry.amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
+                            <td></td>
                             <td></td>
                             <td class="print-bal-cell">
                                 <div class="print-bal-due">Due</div>
@@ -3613,7 +3682,7 @@
                             <td style="white-space: nowrap; text-align: center; color: #475569;">${entry.date || ''}</td>
                             <td style="color: #0f172a; font-weight: 600;">Transfer</td>
                             <td style="color: #334155; font-weight: 600; font-size: 8pt;">${transferRoute}</td>
-                            <td class="print-debit-val">${Number(entry.amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
+                            <td></td>
                             <td></td>
                             <td></td>
                             <td style="color: #475569; font-size: 8pt;">${entry.notes || ''}</td>
